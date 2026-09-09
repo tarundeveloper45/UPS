@@ -40,6 +40,9 @@
   .auth-msg{font-size:12.5px;margin-top:12px;padding:10px;border-radius:8px;display:none;}
   .auth-msg.error{display:block;background:var(--red-tint);color:var(--red);}
   .auth-msg.success{display:block;background:var(--green-tint);color:var(--green);}
+  .auth-subtext{text-align:center;font-size:12.5px;color:var(--muted);margin:14px 0 0;}
+  .auth-subtext a{color:var(--blue);font-weight:600;text-decoration:none;cursor:pointer;}
+  .auth-subtext a:hover{text-decoration:underline;}
   .auth-loading{text-align:center;color:var(--muted);font-size:13px;padding:60px 20px;}
 
   /* ---------- CALCULATOR (unchanged from approved design) ---------- */
@@ -151,6 +154,23 @@
       <button class="auth-tab" id="tabSignUp" type="button">Sign Up</button>
     </div>
 
+    <div class="auth-field" id="fieldFullName" style="display:none;">
+      <label for="authFullName">Full name</label>
+      <input id="authFullName" type="text" autocomplete="name" placeholder="Your name">
+    </div>
+    <div class="auth-field" id="fieldPhone" style="display:none;">
+      <label for="authPhone">Mobile number</label>
+      <div style="display:flex;gap:8px;">
+        <select id="authCountryCode" style="width:110px;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:'IBM Plex Sans',sans-serif;background:#fff;">
+          <option value="+91" selected>India (+91)</option>
+          <option value="+1">USA (+1)</option>
+          <option value="+44">UK (+44)</option>
+          <option value="+971">UAE (+971)</option>
+          <option value="+61">Australia (+61)</option>
+        </select>
+        <input id="authPhone" type="tel" inputmode="numeric" autocomplete="tel-national" placeholder="98765 43210" style="flex:1;">
+      </div>
+    </div>
     <div class="auth-field">
       <label for="authEmail">Email</label>
       <input id="authEmail" type="email" autocomplete="email" placeholder="you@example.com">
@@ -161,7 +181,18 @@
     </div>
 
     <button class="auth-submit" id="authSubmit" type="button">Sign In</button>
+    <p class="auth-subtext" id="authSubtext">Don't have an account? <a href="#" id="switchToSignUp">Sign up</a></p>
     <div class="auth-msg" id="authMsg"></div>
+  </div>
+
+  <div class="auth-wrap" id="confirmScreen" style="display:none;">
+    <div style="text-align:center;">
+      <div style="width:48px;height:48px;border-radius:50%;background:var(--green-tint);color:var(--green);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:22px;">✓</div>
+      <h2>Check your email</h2>
+      <p class="sub" id="confirmEmailText">We've sent a confirmation link to your email address.</p>
+      <p style="font-size:12.5px;color:var(--muted);margin-bottom:20px;">Click the link in that email, then come back and sign in.</p>
+      <button class="auth-submit" id="backToSignIn" style="background:var(--surface);color:var(--navy);border:1.5px solid var(--border);">Back to sign in</button>
+    </div>
   </div>
 </div>
 
@@ -325,10 +356,14 @@ const authScreen = document.getElementById('authScreen');
 const calcScreen = document.getElementById('calcScreen');
 const loadingScreen = document.getElementById('loadingScreen');
 const authMsg = document.getElementById('authMsg');
+const authSubtext = document.getElementById('authSubtext');
+const confirmScreen = document.getElementById('confirmScreen');
+const confirmEmailText = document.getElementById('confirmEmailText');
 const tabSignIn = document.getElementById('tabSignIn');
 const tabSignUp = document.getElementById('tabSignUp');
 const authSubmit = document.getElementById('authSubmit');
 const whoAmI = document.getElementById('whoAmI');
+const authFormWrap = document.querySelector('.auth-wrap');
 
 let mode = 'signin';
 
@@ -340,29 +375,56 @@ function clearMsg(){
   authMsg.className = 'auth-msg';
   authMsg.textContent = '';
 }
+function setMode(m){
+  mode = m;
+  clearMsg();
+  var fieldFullName = document.getElementById('fieldFullName');
+  var fieldPhone = document.getElementById('fieldPhone');
+  if (mode === 'signin'){
+    tabSignIn.classList.add('active');
+    tabSignUp.classList.remove('active');
+    authSubmit.textContent = 'Sign In';
+    authSubtext.innerHTML = 'Don\'t have an account? <a href="#" id="switchLink">Sign up</a>';
+    fieldFullName.style.display = 'none';
+    fieldPhone.style.display = 'none';
+  } else {
+    tabSignUp.classList.add('active');
+    tabSignIn.classList.remove('active');
+    authSubmit.textContent = 'Sign Up';
+    authSubtext.innerHTML = 'Already have an account? <a href="#" id="switchLink">Sign in</a>';
+    fieldFullName.style.display = 'block';
+    fieldPhone.style.display = 'block';
+  }
+  document.getElementById('switchLink').addEventListener('click', function(e){
+    e.preventDefault();
+    setMode(mode === 'signin' ? 'signup' : 'signin');
+  });
+}
 
-tabSignIn.addEventListener('click', function(){
-  mode = 'signin';
-  tabSignIn.classList.add('active');
-  tabSignUp.classList.remove('active');
-  authSubmit.textContent = 'Sign In';
-  clearMsg();
-});
-tabSignUp.addEventListener('click', function(){
-  mode = 'signup';
-  tabSignUp.classList.add('active');
-  tabSignIn.classList.remove('active');
-  authSubmit.textContent = 'Sign Up';
-  clearMsg();
+tabSignIn.addEventListener('click', function(){ setMode('signin'); });
+tabSignUp.addEventListener('click', function(){ setMode('signup'); });
+setMode('signin');
+
+document.getElementById('backToSignIn').addEventListener('click', function(){
+  confirmScreen.style.display = 'none';
+  authFormWrap.style.display = 'block';
+  setMode('signin');
 });
 
 authSubmit.addEventListener('click', async function(){
   var email = document.getElementById('authEmail').value.trim();
   var password = document.getElementById('authPassword').value;
+  var fullName = document.getElementById('authFullName').value.trim();
+  var countryCode = document.getElementById('authCountryCode').value;
+  var phoneRaw = document.getElementById('authPhone').value.trim();
   clearMsg();
 
   if (!email || !password){
     showMsg('Enter both email and password.', 'error');
+    return;
+  }
+  if (mode === 'signup' && (!fullName || !phoneRaw)){
+    showMsg('Enter your full name and mobile number to sign up.', 'error');
     return;
   }
 
@@ -375,14 +437,34 @@ authSubmit.addEventListener('click', async function(){
       if (error) throw error;
       // onAuthStateChange will handle showing the calculator
     } else {
-      var { data, error } = await sb.auth.signUp({ email: email, password: password });
+      var fullPhone = countryCode + ' ' + phoneRaw;
+      var { data, error } = await sb.auth.signUp({
+        email: email,
+        password: password,
+        options: {
+          data: {
+            full_name: fullName,
+            phone: fullPhone
+          }
+        }
+      });
       if (error) throw error;
       if (data.user && !data.session){
-        showMsg('Account created. Check your email to confirm, then sign in.', 'success');
+        confirmEmailText.textContent = 'We\'ve sent a confirmation link to ' + email + '.';
+        authFormWrap.style.display = 'none';
+        confirmScreen.style.display = 'block';
       }
+      // if data.session exists, "Confirm email" is off in Supabase settings —
+      // onAuthStateChange fires immediately and the calculator opens directly.
     }
   } catch (err) {
-    showMsg(err.message || 'Something went wrong.', 'error');
+    var msg = err.message || 'Something went wrong.';
+    if (/email not confirmed/i.test(msg)) {
+      msg = 'This account was created but its email hasn\'t been confirmed yet. Check your inbox for a confirmation link, or ask the site admin to disable email confirmation for testing.';
+    } else if (/invalid login credentials/i.test(msg)) {
+      msg = 'No account found with that email/password. If you haven\'t signed up yet, switch to the Sign Up tab first.';
+    }
+    showMsg(msg, 'error');
   } finally {
     authSubmit.disabled = false;
     authSubmit.textContent = mode === 'signin' ? 'Sign In' : 'Sign Up';
@@ -398,10 +480,13 @@ sb.auth.onAuthStateChange(function(event, session){
   if (session && session.user){
     authScreen.style.display = 'none';
     calcScreen.style.display = 'block';
-    whoAmI.textContent = 'Signed in as ' + session.user.email;
+    var displayName = (session.user.user_metadata && session.user.user_metadata.full_name) || session.user.email;
+    whoAmI.textContent = 'Signed in as ' + displayName;
   } else {
     calcScreen.style.display = 'none';
     authScreen.style.display = 'block';
+    confirmScreen.style.display = 'none';
+    authFormWrap.style.display = 'block';
   }
 });
 
